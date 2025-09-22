@@ -1,15 +1,9 @@
 {
-  "buildCommand": "npm ci && vite build",
-  "outputDirectory": "dist/public",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
   "redirects": [
     {
       "source": "/.well-known/farcaster.json",
       "destination": "https://api.farcaster.xyz/miniapps/hosted-manifest/019965e1-c784-0cb0-1fb2-104aae4c9b2d",
-      "statusCode": 307
+      "permanent": false
     }
   ]
 }
