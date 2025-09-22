@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CornerWalletWidget } from "@/components/corner-wallet-widget";
-// import { ContentGenerator } from "@/components/content-generator"; // KALDIRILDI
+import { ContentGenerator } from "@/components/content-generator";
 import { ImageSelector } from "@/components/image-selector";
 import { ContentPreview } from "@/components/content-preview";
 import { useWallet } from "@/hooks/use-wallet";
@@ -10,10 +10,10 @@ import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { HamburgerMenu } from "@/components/hamburger-menu";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Clock, ExternalLink, Users } from "lucide-react"; // sadeleştirildi
+import { Zap, Sun, Moon, Clock, ExternalLink } from "lucide-react";
 import { SiX } from "react-icons/si";
+import { Users } from "lucide-react";
 import type { ContentDraft } from "@shared/schema";
 
 interface PexelsPhoto {
@@ -40,36 +40,17 @@ interface UploadedImage {
 
 type ImageType = PexelsPhoto | UploadedImage;
 
-// /api/generate JSON'undan metni güvenli çeken ufak yardımcı
-function pickText(d: any): string {
-  return (d?.text || d?.content || d?.result || d?.message || "").toString();
-}
-
-const PRESETS = [
-  { id: "sum3", label: "3 madde özetle", example: "Base ekosistemini 3 maddeyle özetle" },
-  { id: "tweet", label: "Tweet yaz", example: "Base ekosistemi hakkında etkili bir tweet yaz" },
-  { id: "explain", label: "Basitçe anlat", example: "ZK-Rollup'ı 2 paragrafta, basitçe açıkla" },
-];
-
 export default function Home() {
   const [generatedContent, setGeneratedContent] = useState("");
-  const [contentSource, setContentSource] = useState<"ai" | "manual" | null>(null);
+  const [contentSource, setContentSource] = useState<'ai' | 'manual' | null>(null);
   const [selectedImage, setSelectedImage] = useState<ImageType | null>(null);
-
-  // Yeni: sade prompt alanı
-  const [prompt, setPrompt] = useState("");
-  const [genLoading, setGenLoading] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
 
   // Reset all form fields after successful cast
   const resetAllFields = () => {
     setGeneratedContent("");
     setContentSource(null);
     setSelectedImage(null);
-    setPrompt("");
-    setGenError(null);
   };
-
   const { user } = useWallet();
   const { theme, setTheme } = useTheme();
   const { t } = useLanguage();
@@ -88,38 +69,6 @@ export default function Home() {
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
-  };
-
-  // Sade generate: /api/generate?prompt=... (GET)
-  async function generateNow(input: string) {
-    setGenError(null);
-    setGenLoading(true);
-    try {
-      const r = await fetch(`/api/generate?prompt=${encodeURIComponent(input)}`, { method: "GET" });
-      let body: any = {};
-      try { body = await r.json(); } catch {}
-      if (!r.ok) {
-        const msg = body?.message || `İstek başarısız (${r.status})`;
-        throw new Error(msg);
-      }
-      const text = pickText(body);
-      setGeneratedContent(text || "(boş yanıt)");
-      setContentSource("ai");
-    } catch (e: any) {
-      setGenError(e?.message || "Bir hata oluştu");
-    } finally {
-      setGenLoading(false);
-    }
-  }
-
-  const onSubmit = () => {
-    const p = prompt.trim();
-    if (!p) return;
-    generateNow(p);
-  };
-
-  const usePreset = (example: string) => {
-    setPrompt(example);
   };
 
   return (
@@ -171,43 +120,12 @@ export default function Home() {
         <div className="space-y-8">
           {/* Top Row - Creation Tools */}
           <div className="grid lg:grid-cols-2 gap-8 items-stretch">
-            {/* SOLDAN: Sade Prompt + Generate + Presets */}
-            <Card className="h-full">
-              <CardContent className="p-4 md:p-6 space-y-4">
-                <h2 className="text-lg font-semibold text-foreground">Metin Üretici</h2>
-
-                {/* Hızlı seçenekler */}
-                <div className="flex flex-wrap gap-2">
-                  {PRESETS.map(p => (
-                    <Button key={p.id} variant="secondary" size="sm" onClick={() => usePreset(p.example)}>
-                      {p.label}
-                    </Button>
-                  ))}
-                </div>
-
-                {/* Prompt girişi */}
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Bir cümle yaz (örn. Base ekosistemini 3 maddeyle özetle)"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && onSubmit()}
-                  />
-                  <Button onClick={onSubmit} disabled={genLoading || !prompt.trim()}>
-                    {genLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Üret"}
-                  </Button>
-                </div>
-
-                {/* Hata */}
-                {genError && (
-                  <div className="text-sm text-destructive">
-                    {genError}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* SAĞDAN: Görsel seçici */}
+            <div className="h-full">
+              <ContentGenerator onContentGenerated={(content, source) => {
+                setGeneratedContent(content);
+                setContentSource(source);
+              }} />
+            </div>
             <div className="h-full">
               <ImageSelector 
                 selectedImage={selectedImage} 
@@ -229,7 +147,7 @@ export default function Home() {
         </div>
 
         {/* Recent Activity */}
-        {recentDrafts && (recentDrafts as ContentDraft[]).length > 0 && (
+        {recentDrafts && recentDrafts.length > 0 && (
           <div className="mt-12">
             <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center">
               <Clock className="w-6 h-6 mr-2 text-accent" />
@@ -274,11 +192,9 @@ export default function Home() {
                       </p>
                     </div>
 
-                    {/* BURADA ESKİDEN contentType / tone gösteriliyordu → KALDIRILDI */}
                     <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
                       <span className="text-xs text-muted-foreground capitalize">
-                        {/* Örn. basit bilgi göstermek istersen: */}
-                        {draft.isPublished ? "published" : "draft"}
+                        {draft.contentType} • {draft.tone}
                       </span>
                       <Button 
                         variant="ghost" 
