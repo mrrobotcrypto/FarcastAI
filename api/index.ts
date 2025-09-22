@@ -1,12 +1,11 @@
 // api/index.ts
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { makeApp } from "../server/app";
 
-// Tek instance (soğuk başlangıçta kurulur)
 const app = makeApp();
 
-// Vercel: default export edilen handler'ı çağırır
-export default (req: VercelRequest, res: VercelResponse) => {
-  // @ts-ignore - Express signature uyumlu
+// Tip importu kullanmadan çalıştırıyoruz
+export default function handler(req: any, res: any) {
+  // Express app, (req,res) imzasıyla uyumlu
+  // @ts-ignore
   return app(req, res);
-};
+}
