@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { aiService } from "./services/openai";
 import { pexelsService } from "./services/pexels";
 import { farcasterService } from "./services/farcaster";
-import { insertUserSchema, insertContentDraftSchema } from "@shared/schema";
+import { insertUserSchema, insertContentDraftSchema } from "../shared/schema";
 import { z } from "zod";
 
 const generateContentSchema = z.object({

@@ -1,4 +1,4 @@
-// server/index.ts  (lokal/dev için)
+// server/index.ts (yalnızca lokal/dev)
 import { createServer } from "http";
 import { makeApp } from "./app";
 import { setupVite, serveStatic, log } from "./vite";
@@ -7,7 +7,6 @@ import { setupVite, serveStatic, log } from "./vite";
   const app = makeApp();
   const server = createServer(app);
 
-  // Dev ortamında Vite middleware; prod'da statik dosyalar
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
