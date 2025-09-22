@@ -3,13 +3,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Select ve constants importları kalsa da sorun olmaz (kullanmıyoruz)
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// import { Textarea } from "@/components/ui/textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { CONTENT_TYPES, TONE_OPTIONS } from "@/lib/constants";
+// import { CONTENT_TYPES, TONE_OPTIONS } from "@/lib/constants";
 import { useWallet } from "@/hooks/use-wallet";
 import { useLanguage } from "@/components/language-provider";
 import { ContentSuggestions } from "@/components/content-suggestions";
@@ -18,6 +20,10 @@ import { Zap, Loader2, Edit3, AlertCircle, CheckCircle } from "lucide-react";
 interface ContentGeneratorProps {
   onContentGenerated: (content: string, source: 'ai' | 'manual') => void;
 }
+
+// /api/generate JSON'undan güvenli metin seçici
+const pickText = (d: any) =>
+  (d?.text || d?.content || d?.result || d?.message || "").toString();
 
 export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) {
   const [topic, setTopic] = useState("");
@@ -29,27 +35,31 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
   const { t } = useLanguage();
   const queryClient = useQueryClient();
 
-  // Clear form data when language changes
+  // Dil değişince formları temizle (contentType/tone yok artık)
   useEffect(() => {
     const handleLanguageChange = () => {
       setTopic("");
-      setContentType("");
-      setTone("professional");
       setManualContent("");
-      onContentGenerated("", 'manual'); // Clear generated content too
+      onContentGenerated("", 'manual'); // içerik alanını da temizle
     };
-
     window.addEventListener('languageChanged', handleLanguageChange);
     return () => window.removeEventListener('languageChanged', handleLanguageChange);
   }, [onContentGenerated]);
 
+  // AI içerik üretimi: SADECE topic => GET /api/generate?prompt=...
   const generateContentMutation = useMutation({
-    mutationFn: async (data: { topic: string; contentType: string; tone: string }) => {
-      const response = await apiRequest("POST", "/api/content/generate", data);
-      return await response.json();
+    mutationFn: async ({ topic }: { topic: string }) => {
+      const r = await fetch(`/api/generate?prompt=${encodeURIComponent(topic)}`, { method: "GET" });
+      let data: any = {};
+      try { data = await r.json(); } catch {}
+      if (!r.ok) {
+        const msg = data?.message || `İstek başarısız (${r.status})`;
+        throw new Error(msg);
+      }
+      return pickText(data);
     },
-    onSuccess: (data) => {
-      onContentGenerated(data.content, 'ai');
+    onSuccess: (text) => {
+      onContentGenerated(text, 'ai');
       setLastError(null);
       toast({
         title: t('toast.contentGenerated'),
@@ -59,19 +69,18 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
     onError: (error: any) => {
       let errorMessage = error.message || t('toast.failedToGenerate');
       let errorDescription = t('toast.tryAgainLater');
-      
-      // Handle specific AI API errors
-      if (error.message?.includes("quota") || error.message?.includes("billing")) {
+
+      if (error.message?.toLowerCase().includes("quota") || error.message?.toLowerCase().includes("billing")) {
         errorMessage = t('toast.quotaExceeded');
         errorDescription = t('toast.quotaExceededDesc');
-      } else if (error.message?.includes("api_key") || error.message?.includes("unauthorized")) {
+      } else if (error.message?.toLowerCase().includes("api_key") || error.message?.toLowerCase().includes("unauthorized")) {
         errorMessage = t('toast.configIssue');
         errorDescription = t('toast.configIssueDesc');
-      } else if (error.message?.includes("rate_limit")) {
+      } else if (error.message?.toLowerCase().includes("rate_limit")) {
         errorMessage = t('toast.tooManyRequests');
         errorDescription = t('toast.tooManyRequestsDesc');
       }
-      
+
       setLastError(errorMessage);
       toast({
         title: errorMessage,
@@ -111,17 +120,7 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
       });
       return;
     }
-
-    if (!contentType) {
-      toast({
-        title: t('toast.contentTypeRequired'),
-        description: t('toast.contentTypeRequiredDesc'),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    generateContentMutation.mutate({ topic: topic.trim(), contentType, tone });
+    generateContentMutation.mutate({ topic: topic.trim() });
   };
 
   const handleManualSubmit = () => {
@@ -164,15 +163,17 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
     let draftTopic = "";
 
     if (activeTab === "ai") {
-      if (!topic.trim() || !contentType) {
+      if (!topic.trim()) {
         toast({
           title: "Missing information",
-          description: "Please fill in topic and content type before saving",
+          description: "Please fill in topic before saving",
           variant: "destructive",
         });
         return;
       }
       draftTopic = topic.trim();
+      // AI çıktısını ContentPreview'den alan üst parent zaten gösteriyor;
+      // burada generatedContent'i ayrıca taşımıyoruz.
     } else {
       if (!manualContent.trim()) {
         toast({
@@ -189,8 +190,9 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
     const draftData = {
       userId: user.id,
       topic: draftTopic,
-      contentType: activeTab === "ai" ? contentType : "manual",
-      tone: activeTab === "ai" ? tone : "custom",
+      // Şema bozulmasın diye sabit değerler:
+      contentType: activeTab === "ai" ? "auto" : "manual",
+      tone: activeTab === "ai" ? "neutral" : "custom",
       generatedContent: draftContent,
       selectedImage: null,
       isPublished: false,
@@ -249,27 +251,24 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
             {/* Quick Suggestions */}
             <ContentSuggestions onSuggestionClick={(suggestedTopic) => setTopic(suggestedTopic)} />
 
-            
-           
-         <Button
-  onClick={handleGenerate}
-  disabled={generateContentMutation.isPending || !topic.trim()}
-  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed border-0"
-  data-testid="button-generate-content"
->
-  {generateContentMutation.isPending ? (
-    <>
-      <Loader2 className="w-5 h-5 animate-spin" />
-      <span>{t('content.generate')}</span>
-    </>
-  ) : (
-    <>
-      <Zap className="w-5 h-5" />
-      <span>{t('content.generate')}</span>
-    </>
-  )}
-</Button>
-
+            <Button
+              onClick={handleGenerate}
+              disabled={generateContentMutation.isPending || !topic.trim()}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+              data-testid="button-generate-content"
+            >
+              {generateContentMutation.isPending ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>{t('content.generate')}</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-5 h-5" />
+                  <span>{t('content.generate')}</span>
+                </>
+              )}
+            </Button>
           </TabsContent>
 
           <TabsContent value="manual" className="space-y-4">
