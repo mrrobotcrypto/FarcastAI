@@ -18,8 +18,8 @@
     "ogImageUrl": "https://farcast-ai.vercel.app/og.png"
   },
   "accountAssociation": {
-   "header": "eyJmaWQiOjM4Mzk2MCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDE5OEU3NTNFOTdDMjk2NzBkNjQwYjEwODBCODI3NkNGMjQxZEUyN2UifQ",
+ "header": "eyJmaWQiOjM4Mzk2MCwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDUxOUVEOTdCOWMyMTdmODhlMTgxOTYzNjk0MzlDZEEzMmQ3NjdEZjIifQ",
     "payload": "eyJkb21haW4iOiJmYXJjYXN0LWFpLnZlcmNlbC5hcHAifQ",
-    "signature": "MHhiNjY1MTNlYjBlMWQyNzZiMzk2YzA4NjljMTNlOTU3MWQ2NTJiYmY0NDk3MmM2Mjc2MjI5ODE2OTYzMjcyMWU5N2VhNGMxZGQwYjdjNDVmNDg3ZGQwM2Y4ZDI1YmE5YTkzOWMxY2YwMDJhNzI2NDAzNzI3ZjZmZmIzNGMxNDU0NTFj"
+    "signature": "qfWZ9Vs4ePKocHkk7PJwWmmiMbP5LGvLeo4/xa1V/atn+rI805FIh5kXbw7gMheIa+BfqBNP5Qmefz6Gq1bLOxs="
   }
 }
