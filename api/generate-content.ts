@@ -1,1 +1,1 @@
-export { default } from "./_generate_handler";
+export { default } from "./_generate";
