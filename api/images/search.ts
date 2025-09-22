@@ -1,3 +1,4 @@
+// api/images/search.ts
 export default async function handler(req: any, res: any) {
   try {
     // CORS + preflight
@@ -28,12 +29,29 @@ export default async function handler(req: any, res: any) {
     if (color) params.set("color", color);
 
     const url = `https://api.pexels.com/v1/search?${params.toString()}`;
-
     const r = await fetch(url, { headers: { Authorization: key } });
-    const txt = await r.text();
-    // Pexels ne döndürdüyse aynı status ile forward ediyoruz (teşhis için iyi)
-    res.status(r.status).send(txt.slice(0, 4000));
+
+    const raw = await r.json();
+    if (!r.ok) {
+      return res.status(r.status).json(raw);
+    }
+
+    // UI dostu, düzleştirilmiş alan:
+    const images = (raw.photos ?? []).map((p: any) => ({
+      url: p?.src?.medium || p?.src?.landscape || p?.src?.original || null,
+      alt: p?.alt || "",
+      photographer: p?.photographer || "",
+      color: p?.avg_color || ""
+    })).filter((x: any) => !!x.url);
+
+    return res.status(200).json({
+      ok: true,
+      count: images.length,
+      images,        // <- Bunu UI doğrudan render edebilir
+      photos: raw.photos, // <- İstersen eski şema ile de kullan
+      page: raw.page, per_page: raw.per_page, total_results: raw.total_results
+    });
   } catch (e: any) {
-    res.status(500).json({ message: e?.message || "Internal Server Error" });
+    return res.status(500).json({ message: e?.message || "Internal Server Error" });
   }
 }
