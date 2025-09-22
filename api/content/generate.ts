@@ -1,1 +1,1 @@
-export { default } from "../../api/generate";
+export { default } from "../_generate_handler";
