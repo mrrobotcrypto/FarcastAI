@@ -1,0 +1,25 @@
+{
+  "frame": {
+    "name": "FarcastAI",
+    "version": "1",
+    "iconUrl": "https://farcast-ai.vercel.app/icon.png",
+    "homeUrl": "https://farcast-ai.vercel.app",
+    "imageUrl": "https://farcast-ai.vercel.app/image.png",
+    "buttonTitle": "Launch FarcastAI",
+    "splashImageUrl": "https://farcast-ai.vercel.app/splash.png",
+    "splashBackgroundColor": "#FFFFFF",
+    "subtitle": "AI-Powered Content Creator",
+    "description": "Create AI-powered social media content for Farcaster with intelligent text generation, Pexels image integration, and seamless wallet connectivity.",
+    "primaryCategory": "productivity",
+    "tags": ["ai","content","farcaster","social","creator"],
+    "tagline": "AI Content Creator",
+    "ogTitle": "FarcastAI - AI Content Creator",
+    "ogDescription": "Create engaging Farcaster posts with AI-powered content generation and beautiful image selection.",
+    "ogImageUrl": "https://farcast-ai.vercel.app/og.png"
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjM4Mzk2MCwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDUxOUVEOTdCOWMyMTdmODhlMTgxOTYzNjk0MzlDZEEzMmQ3NjdEZjIifQ",
+    "payload": "eyJkb21haW4iOiJmYXJjYXN0LWFpLnZlcmNlbC5hcHAifQ",
+    "signature": "qfWZ9Vs4ePKocHkk7PJwWmmiMbP5LGvLeo4/xa1V/atn+rI805FIh5kXbw7gMheIa+BfqBNP5Qmefz6Gq1bLOxs="
+  }
+}
