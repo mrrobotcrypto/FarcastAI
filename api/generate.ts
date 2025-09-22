@@ -27,7 +27,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Basit Gemini 1.5-pro text generation
-    const model = "models/gemini-1.5-pro";
+    const model = "models/gemini-1.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
 
     const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
