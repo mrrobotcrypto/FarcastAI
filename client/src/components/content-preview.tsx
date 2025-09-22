@@ -58,32 +58,19 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
   // Native Farcaster compose function using Mini Apps SDK
   const openNativeFarcasterCompose = async (content: string, imageUrl?: string) => {
     try {
-      // Import and use Farcaster Mini Apps SDK
       const { sdk } = await import('@farcaster/miniapp-sdk');
-      
-      // Prepare embeds array (SDK expects specific array types)
       const embeds: [] | [string] | [string, string] = imageUrl ? [imageUrl] : [];
-      
-      // Use native Farcaster compose with content and image
-      const result = await sdk.actions.composeCast({
-        text: content,
-        embeds: embeds,
-      });
-      
+      const result = await sdk.actions.composeCast({ text: content, embeds });
       console.log('Farcaster compose result:', result);
-      
+
       toast({
         title: t('content.castOpened'),
         description: t('content.nativeFarcasterOpened'),
       });
-      
-      // Reset fields after native cast success
+
       if (onResetFields) {
-        setTimeout(() => {
-          onResetFields();
-        }, 1000); // Small delay to let user see the success message
+        setTimeout(() => onResetFields(), 1000);
       }
-      
       return true;
     } catch (error) {
       console.warn('Native Farcaster compose not available, falling back to URL:', error);
@@ -94,58 +81,36 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
   const publishMutation = useMutation({
     mutationFn: async (data: { content: string; imageUrl?: string }) => {
       const preparedContent = data.content.trim();
-      
-      // Try native compose first
+
+      // Native önce
       const nativeSuccess = await openNativeFarcasterCompose(preparedContent, data.imageUrl);
-      
       if (!nativeSuccess) {
-        // Create Farcaster compose URL as fallback
         let farcasterUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(preparedContent)}`;
-        
-        // Add image to the compose URL if available
         if (data.imageUrl) {
           farcasterUrl += `&embeds[]=${encodeURIComponent(data.imageUrl)}`;
         }
-        
-        return {
-          castContent: preparedContent,
-          farcasterUrl: farcasterUrl,
-          success: true,
-          useNative: false
-        };
+        return { castContent: preparedContent, farcasterUrl, success: true, useNative: false };
       }
-      
-      return {
-        castContent: preparedContent,
-        success: true,
-        useNative: true
-      };
+      return { castContent: preparedContent, success: true, useNative: true };
     },
     onSuccess: (data) => {
-      if (!data.useNative && data.farcasterUrl) {
-        // Open Farcaster URL in new tab as fallback
-        window.open(data.farcasterUrl, '_blank');
-        
+      if (!data.useNative && (data as any).farcasterUrl) {
+        window.open((data as any).farcasterUrl, '_blank');
         toast({
           title: t('content.castPrepared'),
           description: t('content.shareManually'),
         });
       }
-      
-      // Reset all fields after successful cast
       if (onResetFields) {
-        setTimeout(() => {
-          onResetFields();
-        }, 1000); // Small delay to let user see the success message
+        setTimeout(() => onResetFields(), 1000);
       }
     },
     onError: (error: any) => {
-      // Check if error is due to missing Farcaster FID
       if (error.message && error.message.includes("Farcaster FID not set")) {
         setShowFidModal(true);
         setPendingPublishData({
           content: content.trim(),
-          imageUrl: selectedImage?.src.large,
+          imageUrl: (selectedImage as any)?.src?.large,
         });
       } else {
         toast({
@@ -160,10 +125,7 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
   const handleSaveEdit = () => {
     onContentChange(editedContent);
     setIsEditing(false);
-    toast({
-      title: t('content.contentUpdated'),
-      description: t('content.changesSaved'),
-    });
+    toast({ title: t('content.contentUpdated'), description: t('content.changesSaved') });
   };
 
   const handleCancelEdit = () => {
@@ -181,23 +143,21 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
       return;
     }
 
-    // Check wallet requirement only for AI content
+    // ⚠️ Cüzdan bağlı değilse bile YAYINI ENGELLEME — sadece bilgi ver
     if (contentSource === 'ai' && !user) {
       toast({
-        title: t('wallet.aiContentRequiresWallet'),
-        description: t('wallet.connectWalletToCastAI'),
-        variant: "destructive",
+        title: t('wallet.aiContentRequiresWallet') || "Cüzdan bağlı değil",
+        description: t('wallet.connectWalletToCastAI') || "İçerik panoya kopyalanacak; Warpcast'te paylaşabilirsin.",
       });
-      return;
+      // NOT: return YOK — akış devam ediyor
     }
 
     publishMutation.mutate({
       content: content.trim(),
-      imageUrl: selectedImage?.src.large,
+      imageUrl: (selectedImage as any)?.src?.large,
     });
   };
 
-  // Update local edited content when external content changes
   useEffect(() => {
     setEditedContent(content);
   }, [content]);
@@ -249,19 +209,10 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
                   data-testid="textarea-edit-content"
                 />
                 <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={handleSaveEdit}
-                    data-testid="button-save-edit"
-                  >
+                  <Button size="sm" onClick={handleSaveEdit} data-testid="button-save-edit">
                     {t('content.saveChanges')}
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="secondary" 
-                    onClick={handleCancelEdit}
-                    data-testid="button-cancel-edit"
-                  >
+                  <Button size="sm" variant="secondary" onClick={handleCancelEdit} data-testid="button-cancel-edit">
                     {t('content.cancel')}
                   </Button>
                 </div>
@@ -289,8 +240,8 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
           {selectedImage && (
             <div className="mb-4">
               <img
-                src={selectedImage.src.medium}
-                alt={selectedImage.alt}
+                src={(selectedImage as any).src.medium}
+                alt={(selectedImage as any).alt}
                 className="w-full max-h-64 object-contain rounded-lg"
                 data-testid="preview-image"
               />
@@ -342,7 +293,7 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
 
           {/* Cast Preparation Result */}
           {castPreparation && (
-            <div 
+            <div
               className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-3"
               data-testid="cast-preparation-result"
             >
@@ -352,12 +303,12 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
                   Cast hazırlandı! Manuel olarak Farcaster'da paylaşın
                 </p>
               </div>
-              
+
               <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border">
                 <p className="text-xs text-muted-foreground mb-2">Hazırlanan içerik:</p>
                 <p className="text-sm text-foreground">{castPreparation.castContent}</p>
               </div>
-              
+
               <Button
                 onClick={() => window.open(castPreparation.farcasterUrl, '_blank')}
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white"
@@ -366,7 +317,7 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Farcaster'da Aç ve Paylaş
               </Button>
-              
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -379,9 +330,8 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
             </div>
           )}
 
-          {/* Demo Mode Indicator - Only show when demo mode is enabled */}
           {import.meta.env.VITE_DEMO_MODE === 'true' && (
-            <div 
+            <div
               className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3"
               data-testid="status-demo-mode"
             >
@@ -390,7 +340,6 @@ export function ContentPreview({ content, selectedImage, contentSource, onConten
               </p>
             </div>
           )}
-
         </div>
       </CardContent>
     </Card>
