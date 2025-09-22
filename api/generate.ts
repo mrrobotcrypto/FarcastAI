@@ -3,6 +3,19 @@ type ReqBody = { prompt?: string; topic?: string; lang?: string };
 
 export default async function handler(req: any, res: any) {
   try {
+    // ---- Basit CORS + preflight ----
+    const origin = (req.headers?.origin as string) || "*";
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+
     // ---- Body/Query'den prompt topla (GET ve POST destekli) ----
     let body: ReqBody = {};
     if (req.method === "GET") {
@@ -11,7 +24,6 @@ export default async function handler(req: any, res: any) {
     } else if (req.method === "POST") {
       body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     } else {
-      // Diğer methodlar da gelsin istersen bu bloğu kaldırabilirsin
       return res.status(405).json({ message: "Only GET or POST" });
     }
 
