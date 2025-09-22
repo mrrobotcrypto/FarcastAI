@@ -21,8 +21,6 @@ interface ContentGeneratorProps {
 
 export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) {
   const [topic, setTopic] = useState("");
-  const [contentType, setContentType] = useState("");
-  const [tone, setTone] = useState("professional");
   const [manualContent, setManualContent] = useState("");
   const [activeTab, setActiveTab] = useState("ai");
   const [lastError, setLastError] = useState<string | null>(null);
@@ -253,24 +251,25 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
 
             
            
-            <Button
-              onClick={handleGenerate}
-              disabled={generateContentMutation.isPending || !topic.trim() || !contentType}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed border-0"
-              data-testid="button-generate-content"
-            >
-              {generateContentMutation.isPending ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>{t('content.generate')}</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-5 h-5" />
-                  <span>{t('content.generate')}</span>
-                </>
-              )}
-            </Button>
+         <Button
+  onClick={handleGenerate}
+  disabled={generateContentMutation.isPending || !topic.trim()}
+  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+  data-testid="button-generate-content"
+>
+  {generateContentMutation.isPending ? (
+    <>
+      <Loader2 className="w-5 h-5 animate-spin" />
+      <span>{t('content.generate')}</span>
+    </>
+  ) : (
+    <>
+      <Zap className="w-5 h-5" />
+      <span>{t('content.generate')}</span>
+    </>
+  )}
+</Button>
+
           </TabsContent>
 
           <TabsContent value="manual" className="space-y-4">
