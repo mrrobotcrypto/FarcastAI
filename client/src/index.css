@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(222, 84%, 4%);
+  --foreground: hsl(210, 40%, 98%);
+  --card: hsl(222, 84%, 4%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --popover: hsl(222, 84%, 4%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --primary: hsl(243, 75%, 59%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(215, 27%, 17%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --muted: hsl(215, 27%, 17%);
+  --muted-foreground: hsl(217, 10%, 64%);
+  --accent: hsl(38, 92%, 50%);
+  --accent-foreground: hsl(222, 84%, 4%);
+  --destructive: hsl(0, 63%, 31%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --border: hsl(215, 27%, 17%);
+  --input: hsl(215, 27%, 17%);
+  --ring: hsl(243, 75%, 59%);
+  --radius: 0.5rem;
+  --chart-1: hsl(203.8863, 88.2845%, 53.1373%);
+  --chart-2: hsl(159.7826, 100%, 36.0784%);
+  --chart-3: hsl(42.0290, 92.8251%, 56.2745%);
+  --chart-4: hsl(147.1429, 78.5047%, 41.9608%);
+  --chart-5: hsl(341.4894, 75.2000%, 50.9804%);
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: Menlo, monospace;
+  --shadow-2xs: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00);
+  --shadow-xs: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00);
+  --shadow-sm: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00), 0px 1px 2px -1px hsl(243, 75%, 59%, 0.00);
+  --shadow: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00), 0px 1px 2px -1px hsl(243, 75%, 59%, 0.00);
+  --shadow-md: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00), 0px 2px 4px -1px hsl(243, 75%, 59%, 0.00);
+  --shadow-lg: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00), 0px 4px 6px -1px hsl(243, 75%, 59%, 0.00);
+  --shadow-xl: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00), 0px 8px 10px -1px hsl(243, 75%, 59%, 0.00);
+  --shadow-2xl: 0px 2px 0px 0px hsl(243, 75%, 59%, 0.00);
+  --spacing: 0.25rem;
+}
+
+.light {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(222, 84%, 4%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(222, 84%, 4%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(222, 84%, 4%);
+  --primary: hsl(243, 75%, 59%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(210, 40%, 96%);
+  --secondary-foreground: hsl(222, 84%, 4%);
+  --muted: hsl(210, 40%, 96%);
+  --muted-foreground: hsl(215, 16%, 47%);
+  --accent: hsl(38, 92%, 50%);
+  --accent-foreground: hsl(222, 84%, 4%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --border: hsl(214, 32%, 91%);
+  --input: hsl(214, 32%, 91%);
+  --ring: hsl(243, 75%, 59%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+.wallet-gradient {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+}
+
+.content-card {
+  backdrop-filter: blur(10px);
+  background: hsl(var(--card) / 0.8);
+}
+
+.generate-button {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(243, 75%, 49%));
+  box-shadow: 0 4px 14px 0 hsl(var(--primary) / 0.35);
+  border: 1px solid hsl(var(--primary) / 0.5);
+}
+
+.generate-button:hover {
+  background: linear-gradient(135deg, hsl(243, 75%, 49%), hsl(243, 75%, 39%));
+  box-shadow: 0 6px 20px 0 hsl(var(--primary) / 0.5);
+  transform: translateY(-1px);
+}
+
+.generate-button:disabled {
+  background: linear-gradient(135deg, hsl(var(--muted)), hsl(var(--muted-foreground) / 0.5));
+  box-shadow: none;
+  border: 1px solid hsl(var(--border));
+  transform: none;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Tab styling improvements */
+.tabs-list-improved {
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid hsl(var(--border));
+}
+
+/* Upload drop zone styling */
+.upload-drop-zone {
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--muted) / 0.3) 100%);
+  border: 2px dashed hsl(var(--border));
+  transition: all 0.3s ease;
+}
+
+.upload-drop-zone:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--primary) / 0.05) 100%);
+}
+
+.farcaster-purple {
+  background: linear-gradient(135deg, #8B5CF6, #A855F7);
+}
