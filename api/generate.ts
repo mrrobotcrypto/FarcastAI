@@ -3,11 +3,11 @@ type ReqBody = { prompt?: string; topic?: string; lang?: string };
 
 export default async function handler(req: any, res: any) {
   try {
-    // ---- Basit CORS + preflight ----
+    // ---- CORS + preflight ----
     const origin = (req.headers?.origin as string) || "*";
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.setHeader("Access-Control-Allow-Credentials", "true");
 
@@ -16,15 +16,15 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    // ---- Body/Query'den prompt topla (GET ve POST destekli) ----
+    // ---- Body/Query'den prompt topla (tüm methodlar) ----
     let body: ReqBody = {};
     if (req.method === "GET") {
       const q = req.query || {};
       body = { prompt: (q.prompt || q.topic || "").toString() } as any;
-    } else if (req.method === "POST") {
-      body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     } else {
-      return res.status(405).json({ message: "Only GET or POST" });
+      // JSON + FormData (multipart/urlencoded) destekle
+      const raw = (typeof req.body === "string") ? safeJson(req.body) : (req.body || {});
+      body = normalizeBody(raw);
     }
 
     const prompt = body.prompt ?? body.topic ?? "";
@@ -33,7 +33,6 @@ export default async function handler(req: any, res: any) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(503).json({ message: "GEMINI_API_KEY missing in Vercel env" });
 
-    // Daha uygun kota: flash
     const model = "models/gemini-1.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
 
@@ -55,8 +54,22 @@ export default async function handler(req: any, res: any) {
       data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text).join("\n") ??
       data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    return res.status(200).json({ ok: true, result: text });
+    return res.status(200).json({ ok: true, result: text, via: req.method });
   } catch (err: any) {
     return res.status(500).json({ message: err?.message || "Internal Server Error" });
   }
+}
+
+function safeJson(s: string) {
+  try { return JSON.parse(s); } catch { return {}; }
+}
+
+function normalizeBody(raw: any): ReqBody {
+  // form-data/url-encoded durumunda değerler objeye string olarak düşer
+  if (raw && typeof raw === "object") {
+    const prompt = raw.prompt ?? raw.topic ?? raw.text ?? "";
+    const lang = raw.lang ?? raw.language ?? undefined;
+    return { prompt: String(prompt || ""), lang: lang ? String(lang) : undefined };
+  }
+  return {};
 }
