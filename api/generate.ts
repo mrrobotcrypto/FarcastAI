@@ -1,6 +1,29 @@
 // api/generate.ts
 type ReqBody = { prompt?: string; topic?: string; lang?: string };
 
+// Kısa metin zorunluluğu + sonda #FarcastAI etiketi
+function enforceShortOutput(text: string): string {
+  if (!text) return "";
+
+  // Madde işaretleri ve başlıkları sadeleştir
+  let t = text
+    .replace(/^(\s*[-*]\s+)/gm, "")       // "- " veya "* " başlarını kaldır
+    .replace(/^(\s*\d+\.\s+)/gm, "")      // "1. " gibi numaralı listeleri kaldır
+    .replace(/^#{1,6}\s+/gm, "");         // "# Başlık" markdown başlıklarını kaldır
+
+  // Paragraflara böl, en fazla 2 paragraf bırak
+  const paras = t.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).slice(0, 2);
+  t = paras.join("\n\n");
+
+  // Çok uzunsa yumuşat (yaklaşık 700 karakter)
+  if (t.length > 700) t = t.slice(0, 680).replace(/\s+\S*$/, "") + "…";
+
+  // Sonda #FarcastAI yoksa ekle
+  if (!/#FarcastAI\b/.test(t)) t = t.replace(/\s+$/, "") + " #FarcastAI";
+
+  return t;
+}
+
 export default async function handler(req: any, res: any) {
   try {
     // CORS + preflight
@@ -90,9 +113,21 @@ export default async function handler(req: any, res: any) {
 
     const model = process.env.GEMINI_MODEL || "models/gemini-1.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
+
+    // KISA-ÇIKTI talimatı ile sarmalanmış nihai prompt
+    const finalPrompt =
+`Aşağıdaki isteğe KISA ve ÖZ yanıt ver. ÇIKTI KURALLARI:
+- Tercihen 1 paragraf, en fazla 2 paragraf.
+- Liste/madde işareti kullanma; akıcı düz metin yaz.
+- Gevezelik etme; somut ve net ol.
+- Yanıtın SONUNDA mutlaka "#FarcastAI" etiketi olsun.
+
+İSTEK:
+${prompt}`;
+
     const payload = {
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7 },
+      contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+      generationConfig: { temperature: 0.6 },
     };
 
     const r = await fetch(url, {
@@ -116,9 +151,11 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const text =
+    const raw =
       data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text).filter(Boolean).join("\n") ??
       data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+    const text = enforceShortOutput(raw || "");
 
     res.status(200).json({
       ok: true,

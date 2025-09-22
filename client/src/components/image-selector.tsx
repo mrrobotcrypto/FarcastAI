@@ -9,20 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/components/language-provider";
 import { Image as ImageIcon, Search, Loader2, Upload, X, FileImage } from "lucide-react";
 
-// image-selector.tsx (import'ların ALTINA ekle)
-function toImageUrls(data: any): string[] {
-  if (Array.isArray(data?.images) && data.images.length) {
-    return data.images.map((x: any) => x.url).filter(Boolean);
-  }
-  return (data?.photos ?? [])
-    .map((p: any) => p?.src?.medium || p?.src?.landscape || p?.src?.original)
-    .filter(Boolean);
-}
-
-
 // --- helpers ---
 function toPexelsPhotos(data: any): PexelsPhoto[] {
-  // Tercihen ham Pexels şemasını kullan (id, src vb. tam geliyor)
   if (Array.isArray(data?.photos) && data.photos.length) {
     return data.photos.map((p: any) => ({
       id: p.id,
@@ -34,10 +22,9 @@ function toPexelsPhotos(data: any): PexelsPhoto[] {
       photographer: p?.photographer || "",
     }));
   }
-  // Normalize ettiğimiz images[] varsa oradan doldur (id'yi üret)
   if (Array.isArray(data?.images) && data.images.length) {
     return data.images.map((x: any, i: number) => ({
-      id: -1000 - i, // sentetik id, çakışmaz
+      id: -1000 - i,
       src: {
         medium: x?.url,
         large: x?.url,
@@ -51,20 +38,14 @@ function toPexelsPhotos(data: any): PexelsPhoto[] {
 
 interface PexelsPhoto {
   id: number;
-  src: {
-    medium: string;
-    large: string;
-  };
+  src: { medium: string; large: string };
   alt: string;
   photographer: string;
 }
 
 interface UploadedImage {
   id: string;
-  src: {
-    medium: string;
-    large: string;
-  };
+  src: { medium: string; large: string };
   alt: string;
   photographer: string;
   isUploaded: true;
@@ -87,7 +68,7 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
   const { toast } = useToast();
   const { t } = useLanguage();
 
-  // --- FEATURED: önerilen 6 görsel (sayfa ilk açıldığında gelsin) ---
+  // FEATURED görseller (her 1 saatte bir yenilensin)
   const {
     data: featuredResults,
     isLoading: loadingFeatured,
@@ -98,12 +79,13 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
       const response = await fetch("/api/images/featured?per_page=6", { method: "GET" });
       if (!response.ok) throw new Error("featured failed");
       const data = await response.json();
-      return toPexelsPhotos(data); // <- PexelsPhoto[]
+      return toPexelsPhotos(data);
     },
     staleTime: 60_000,
+    refetchInterval: 3600000, // 1 saat
   });
 
-  // --- SEARCH: arama terimi verilince çalışır ---
+  // SEARCH görselleri
   const {
     data: searchResults,
     isLoading: loadingSearch,
@@ -117,7 +99,7 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
       );
       if (!response.ok) throw new Error("search failed");
       const data = await response.json();
-      return toPexelsPhotos(data); // <- PexelsPhoto[]
+      return toPexelsPhotos(data);
     },
     enabled: !!searchTerm,
     staleTime: 60_000,
@@ -147,7 +129,6 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-
     files.forEach((file) => {
       if (!file.type.startsWith("image/")) {
         toast({
@@ -167,7 +148,6 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
       }
 
       const imageUrl = URL.createObjectURL(file);
-
       const uploadedImage: UploadedImage = {
         id: `upload-${Date.now()}-${Math.random()}`,
         src: { medium: imageUrl, large: imageUrl },
@@ -176,15 +156,9 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
         isUploaded: true,
         file,
       };
-
       setUploadedImages((prev) => [...prev, uploadedImage]);
-
-      toast({
-        title: t("image.imageUploaded"),
-        description: `${file.name} has been uploaded successfully`,
-      });
+      toast({ title: t("image.imageUploaded"), description: `${file.name} uploaded successfully` });
     });
-
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -194,27 +168,16 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
       if (image) URL.revokeObjectURL(image.src.medium);
       return prev.filter((img) => img.id !== imageId);
     });
-
-    if (
-      selectedImage &&
-      "isUploaded" in selectedImage &&
-      (selectedImage as UploadedImage).id === imageId
-    ) {
+    if (selectedImage && "isUploaded" in selectedImage && (selectedImage as UploadedImage).id === imageId) {
       onImageSelect(null as any);
     }
   };
 
   const triggerFileUpload = () => fileInputRef.current?.click();
 
-  // Arama varsa searchResults, yoksa featuredResults göster
-  const pexelsImages: PexelsPhoto[] =
-    (searchResults as PexelsPhoto[] | undefined) ??
-    (featuredResults as PexelsPhoto[] | undefined) ??
-    [];
-
+  const pexelsImages: PexelsPhoto[] = searchResults ?? featuredResults ?? [];
   const isLoading = loadingFeatured || loadingSearch;
 
-  // Hata mesajlarını göster (opsiyonel)
   if (featuredError || searchError) {
     console.warn("Image fetch error", featuredError || searchError);
   }
@@ -229,186 +192,94 @@ export function ImageSelector({ selectedImage, onImageSelect }: ImageSelectorPro
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="pexels" className="flex items-center gap-2" data-testid="tab-pexels">
+            <TabsTrigger value="pexels" className="flex items-center gap-2">
               <Search className="w-4 h-4" />
               {t("image.stockPhotos")}
             </TabsTrigger>
-            <TabsTrigger value="upload" className="flex items-center gap-2" data-testid="tab-upload">
+            <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
               {t("image.uploadImage")}
             </TabsTrigger>
           </TabsList>
 
+          {/* STOCK PHOTOS */}
           <TabsContent value="pexels" className="space-y-4">
-            {/* Search Interface */}
-            <div>
-              <Label htmlFor="image-search" className="text-sm font-medium text-foreground mb-2 block">
-                {t("image.searchStockPhotos")}
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="image-search"
-                  type="text"
-                  placeholder={t("image.searchPlaceholder")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="flex-1"
-                  data-testid="input-image-search"
-                />
-                <Button
-                  onClick={handleSearch}
-                  disabled={isLoading || !searchQuery.trim()}
-                  data-testid="button-search-images"
-                >
-                  {loadingSearch ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder={t("image.searchPlaceholder")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="flex-1"
+              />
+              <Button onClick={handleSearch} disabled={isLoading || !searchQuery.trim()}>
+                {loadingSearch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              </Button>
             </div>
 
-            {/* Pexels Image Grid */}
             {isLoading ? (
               <div className="grid grid-cols-2 gap-3">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="w-full aspect-video bg-muted rounded-lg animate-pulse"
-                  />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="w-full aspect-video bg-muted rounded-lg animate-pulse" />
                 ))}
               </div>
             ) : pexelsImages.length > 0 ? (
               <div className="grid grid-cols-2 gap-3">
-                {pexelsImages.map((image: PexelsPhoto) => (
+                {pexelsImages.map((image) => (
                   <div
                     key={image.id}
-                    className={`relative group cursor-pointer transition-all duration-200 ${
-                      selectedImage?.id === image.id
-                        ? "ring-2 ring-primary"
-                        : "hover:ring-2 hover:ring-primary/50"
+                    className={`relative group cursor-pointer transition ${
+                      selectedImage?.id === image.id ? "ring-2 ring-primary" : "hover:ring-2 hover:ring-primary/50"
                     }`}
                     onClick={() => handleImageSelect(image)}
-                    data-testid={`image-option-${image.id}`}
                   >
                     <img
                       src={image.src.medium}
                       alt={image.alt}
-                      className="w-full max-h-32 object-contain rounded-lg"
+                      className="w-full aspect-video object-cover rounded-lg"
                       loading="lazy"
                     />
-                    {selectedImage?.id === image.id && (
-                      <div className="absolute inset-0 bg-primary/20 rounded-lg flex items-center justify-center">
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                          <ImageIcon className="w-4 h-4 text-primary-foreground" />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-muted-foreground">
-                  {searchTerm ? "No images found for your search" : "Search for images to get started"}
-                </p>
+              <div className="text-center py-8 text-muted-foreground">
+                {searchTerm ? "No images found" : "Search for images to get started"}
               </div>
             )}
           </TabsContent>
 
+          {/* UPLOAD */}
           <TabsContent value="upload" className="space-y-4">
-            {/* File Upload Interface */}
-            <div>
-              <Label className="text-sm font-medium text-foreground mb-2 block">
-                {t("image.uploadYourImages")}
-              </Label>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-                data-testid="input-file-upload"
-              />
-
-              <div
-                onClick={triggerFileUpload}
-                className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                data-testid="drop-zone-upload"
-              >
-                <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm font-medium text-foreground mb-1">
-                  {t("image.clickToUpload")}
-                </p>
-                <p className="text-xs text-muted-foreground">Supports JPG, PNG, GIF up to 10MB</p>
-              </div>
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" />
+            <div onClick={triggerFileUpload} className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer">
+              <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <p>{t("image.clickToUpload")}</p>
             </div>
-
-            {/* Uploaded Images Grid */}
-            {uploadedImages.length > 0 ? (
-              <div>
-                <Label className="text-sm font-medium text-foreground mb-2 block">
-                  Your Uploaded Images ({uploadedImages.length})
-                </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {uploadedImages.map((image: UploadedImage) => (
-                    <div
-                      key={image.id}
-                      className={`relative group cursor-pointer transition-all duration-200 ${
-                        selectedImage?.id === image.id
-                          ? "ring-2 ring-primary"
-                          : "hover:ring-2 hover:ring-primary/50"
-                      }`}
-                      data-testid={`uploaded-image-${image.id}`}
+            {uploadedImages.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                {uploadedImages.map((img) => (
+                  <div key={img.id} className="relative group cursor-pointer">
+                    <img
+                      src={img.src.medium}
+                      alt={img.alt}
+                      className="w-full aspect-video object-cover rounded-lg"
+                      onClick={() => handleImageSelect(img)}
+                    />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-1 right-1 w-6 h-6 p-0 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveUploadedImage(img.id);
+                      }}
                     >
-                      <img
-                        src={image.src.medium}
-                        alt={image.alt}
-                        className="w-full max-h-32 object-contain rounded-lg"
-                        onClick={() => handleImageSelect(image)}
-                      />
-
-                      {selectedImage?.id === image.id && (
-                        <div className="absolute inset-0 bg-primary/20 rounded-lg flex items-center justify-center">
-                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                            <ImageIcon className="w-4 h-4 text-primary-foreground" />
-                          </div>
-                        </div>
-                      )}
-
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-1 right-1 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveUploadedImage(image.id);
-                        }}
-                        data-testid={`button-remove-${image.id}`}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-lg">
-                        <FileImage className="w-3 h-3 inline mr-1" />
-                        {image.file?.name && image.file.name.length > 15
-                          ? `${image.file.name.slice(0, 15)}...`
-                          : image.file?.name || image.alt}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-muted-foreground">{t("image.noUploadedImages")}</p>
-                <p className="text-xs text-muted-foreground mt-1">Upload images to get started</p>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </TabsContent>

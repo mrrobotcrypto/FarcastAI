@@ -1,5 +1,43 @@
+// api/images/featured.ts
+export const config = {
+  api: {
+    bodyParser: false, // sadece GET
+  },
+};
+
+type PexelsPhoto = {
+  id: number;
+  width: number;
+  height: number;
+  alt?: string;
+  photographer?: string;
+  avg_color?: string;
+  src?: {
+    original?: string;
+    landscape?: string;
+    medium?: string;
+  };
+};
+
+function pickUrl(p: PexelsPhoto): string | null {
+  return p?.src?.landscape || p?.src?.medium || p?.src?.original || null;
+}
+
+async function pexelsSearch(query: string, perPage: number, page: number, key: string) {
+  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}`;
+  const r = await fetch(url, { headers: { Authorization: key } });
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    const err = new Error(`Pexels error ${r.status}: ${body.slice(0, 400)}`);
+    // küçük gecikmeli retry önerisi yerine direkt hata
+    throw err;
+  }
+  return r.json();
+}
+
 export default async function handler(req: any, res: any) {
   try {
+    // ----- CORS & Methods -----
     const origin = (req.headers?.origin as string) || "*";
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -7,43 +45,78 @@ export default async function handler(req: any, res: any) {
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.setHeader("Access-Control-Allow-Credentials", "true");
     if (req.method === "OPTIONS") { res.status(204).end(); return; }
-    if (req.method !== "GET") { res.status(405).json({ message: "Only GET" }); return; }
+    if (req.method !== "GET") { res.status(405).json({ ok: false, message: "Only GET" }); return; }
 
     const key = process.env.PEXELS_API_KEY;
-    if (!key) { res.status(503).json({ message: "PEXELS_API_KEY missing in Vercel env" }); return; }
+    if (!key) { res.status(503).json({ ok: false, message: "PEXELS_API_KEY missing in Vercel env" }); return; }
 
-    const perPage = Math.min(parseInt((req.query?.per_page || "6") as string, 10) || 6, 30);
-    const page = Math.max(parseInt((req.query?.page || "1") as string, 10) || 1, 1);
+    // ----- Saatlik cache anahtarı -----
+    const hourBucket = Math.floor(Date.now() / 3600000); // her saat değişir
+    const cacheKey = `featured:${hourBucket}`;
 
-    // Pexels curated feed
-    const params = new URLSearchParams({ per_page: String(perPage), page: String(page) });
-    const url = `https://api.pexels.com/v1/curated?${params.toString()}`;
-
-    const r = await fetch(url, { headers: { Authorization: key } });
-    const raw = await r.json();
-
-    if (!r.ok) {
-      res.status(r.status).json(raw);
+    // Vercel Node runtime: aynı lambda süresince global değişken korunabilir
+    const g = globalThis as any;
+    g.__FEATURED_CACHE__ = g.__FEATURED_CACHE__ || new Map<string, any>();
+    if (g.__FEATURED_CACHE__.has(cacheKey)) {
+      const payload = g.__FEATURED_CACHE__.get(cacheKey);
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=59");
+      res.status(200).json(payload);
       return;
     }
 
-    const images = (raw.photos ?? []).map((p: any) => ({
-      url: p?.src?.medium || p?.src?.landscape || p?.src?.original || null,
-      alt: p?.alt || "",
-      photographer: p?.photographer || "",
-      color: p?.avg_color || ""
-    })).filter((x: any) => !!x.url);
+    // ----- Kategoriler -----
+    // Her birinden 2 görsel: toplam 6
+    const categories = [
+      { q: "landscape scenery nature", take: 2 },
+      { q: "cryptocurrency bitcoin blockchain", take: 2 },
+      { q: "nft gaming metaverse", take: 2 },
+    ];
 
-    res.status(200).json({
+    const perCatFetch = 14; // yeterince havuz (landscape filtrelemek için)
+    const page = 1;
+
+    const images: Array<{ id: number; url: string; alt: string; photographer: string; color?: string }> = [];
+
+    for (const cat of categories) {
+      const data = await pexelsSearch(cat.q, perCatFetch, page, key);
+      const photos: PexelsPhoto[] = data?.photos || [];
+
+      // Landscape öncelikli
+      const landscape = photos.filter(p => (p?.width || 0) >= (p?.height || 0));
+      const pool = (landscape.length >= cat.take) ? landscape : photos;
+
+      // Seç ve normalize et
+      const picked = pool
+        .filter(p => !!pickUrl(p))
+        .slice(0, cat.take)
+        .map((p) => ({
+          id: p.id,
+          url: pickUrl(p)!,
+          alt: p.alt || "",
+          photographer: p.photographer || "",
+          color: p.avg_color || undefined,
+        }));
+
+      images.push(...picked);
+    }
+
+    const payload = {
       ok: true,
       count: images.length,
-      images,
-      photos: raw.photos,
-      page: raw.page,
-      per_page: raw.per_page,
-      total_results: raw.total_results
-    });
+      images,             // UI burada doğrudan kullanabilir
+      page,
+      per_category: 2,    // bilgi amaçlı
+      categories: ["landscape", "crypto", "nft/gaming"],
+      ts: Date.now(),
+    };
+
+    // Cache’e koy
+    g.__FEATURED_CACHE__.set(cacheKey, payload);
+
+    // 1 saatlik önbellek başlığı
+    res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=59");
+    res.status(200).json(payload);
   } catch (e: any) {
-    res.status(500).json({ message: e?.message || "Internal Server Error" });
+    res.status(500).json({ ok: false, message: e?.message || "Internal Server Error" });
   }
 }
