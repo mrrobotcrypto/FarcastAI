@@ -251,42 +251,8 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
             {/* Quick Suggestions */}
             <ContentSuggestions onSuggestionClick={(suggestedTopic) => setTopic(suggestedTopic)} />
 
-            <div>
-              <Label htmlFor="content-type" className="text-sm font-medium text-foreground mb-2 block">
-                {t('content.type')}
-              </Label>
-              <Select value={contentType} onValueChange={setContentType}>
-                <SelectTrigger className="w-full" data-testid="select-content-type">
-                  <SelectValue placeholder="Select content type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONTENT_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-sm font-medium text-foreground mb-2 block">{t('content.tone')}</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {TONE_OPTIONS.map((toneOption) => (
-                  <Button
-                    key={toneOption.value}
-                    variant={tone === toneOption.value ? "default" : "secondary"}
-                    size="sm"
-                    onClick={() => setTone(toneOption.value)}
-                    className={tone === toneOption.value ? "bg-primary text-primary-foreground" : ""}
-                    data-testid={`button-tone-${toneOption.value}`}
-                  >
-                    {toneOption.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
+            
+           
             <Button
               onClick={handleGenerate}
               disabled={generateContentMutation.isPending || !topic.trim() || !contentType}
