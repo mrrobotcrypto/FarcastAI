@@ -24,6 +24,8 @@ function enforceShortOutput(text: string): string {
   return t;
 }
 
+function safeJson(s: string) { try { return JSON.parse(s); } catch { return {}; } }
+
 export default async function handler(req: any, res: any) {
   try {
     // CORS + preflight
@@ -50,16 +52,19 @@ export default async function handler(req: any, res: any) {
     };
 
     let prompt = "";
+    let lang = "en"; // default: en
 
     if (method === "GET") {
       const q = req.query || {};
       // URL'den: ?prompt=, ?topic=, ?q=, ?text=, ?title=, ?query=
       prompt = firstNonEmpty(q.prompt, q.topic, q.q, q.text, q.title, q.query);
+      lang = String(q.lang || q.language || "en").toLowerCase();
     } else if (method === "POST") {
       const ct = String(req.headers?.["content-type"] || "");
       if (ct.includes("application/json")) {
         const raw = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
         prompt = firstNonEmpty(raw.prompt, raw.topic, raw.q, raw.text, raw.title, raw.query);
+        lang = String(raw.lang || raw.language || "en").toLowerCase();
       } else if (ct.includes("application/x-www-form-urlencoded")) {
         // URL-encoded body
         const bodyStr = typeof req.body === "string" ? req.body : "";
@@ -73,6 +78,7 @@ export default async function handler(req: any, res: any) {
             params.get("title"),
             params.get("query")
           );
+          lang = String(params.get("lang") || params.get("language") || "en").toLowerCase();
         } catch { /* yoksay */ }
       } else if (ct.startsWith("multipart/form-data")) {
         return res.status(415).json({
@@ -84,6 +90,7 @@ export default async function handler(req: any, res: any) {
         // Bazı istemciler content-type göndermiyor → basit deneme
         const raw = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
         prompt = firstNonEmpty(raw.prompt, raw.topic, raw.q, raw.text, raw.title, raw.query);
+        lang = String((raw as any)?.lang || (raw as any)?.language || "en").toLowerCase();
       } else {
         return res.status(415).json({
           ok: false,
@@ -100,9 +107,9 @@ export default async function handler(req: any, res: any) {
         ok: false,
         message: "Missing prompt/topic",
         examples: [
-          "/api/generate?prompt=Merhaba",
-          "/api/generate?topic=Bitcoin%20nedir",
-          "POST JSON: {\"prompt\":\"Merhaba\"} veya {\"topic\":\"Bitcoin nedir\"}"
+          "/api/generate?prompt=Merhaba&lang=tr",
+          "/api/generate?topic=Bitcoin%20nedir&lang=tr",
+          "POST JSON: {\"prompt\":\"What is Bitcoin?\", \"lang\":\"en\"}"
         ]
       });
     }
@@ -114,15 +121,21 @@ export default async function handler(req: any, res: any) {
     const model = process.env.GEMINI_MODEL || "models/gemini-1.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
 
+    // Dil talimatı
+    const langLine = lang === "tr"
+      ? "Yanıtı TÜRKÇE yaz."
+      : "Write the answer in ENGLISH.";
+
     // KISA-ÇIKTI talimatı ile sarmalanmış nihai prompt
     const finalPrompt =
-`Aşağıdaki isteğe KISA ve ÖZ yanıt ver. ÇIKTI KURALLARI:
+`${langLine}
+KISA ve ÖZ yanıt ver. ÇIKTI KURALLARI:
 - Tercihen 1 paragraf, en fazla 2 paragraf.
 - Liste/madde işareti kullanma; akıcı düz metin yaz.
-- Gevezelik etme; somut ve net ol.
+- Gereksiz uzatmadan somut ve net ol.
 - Yanıtın SONUNDA mutlaka "#FarcastAI" etiketi olsun.
 
-İSTEK:
+İSTEK / REQUEST:
 ${prompt}`;
 
     const payload = {
@@ -155,6 +168,7 @@ ${prompt}`;
       data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text).filter(Boolean).join("\n") ??
       data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
+    // Son aşamada da kısalık/etiket garantisi
     const text = enforceShortOutput(raw || "");
 
     res.status(200).json({
@@ -162,6 +176,7 @@ ${prompt}`;
       via: method,
       provider: "gemini",
       model,
+      lang,
       text,           // modern
       content: text,  // alternatif
       result: text,   // legacy
@@ -172,5 +187,3 @@ ${prompt}`;
     res.status(500).json({ ok: false, message: err?.message || "Internal Server Error" });
   }
 }
-
-function safeJson(s: string) { try { return JSON.parse(s); } catch { return {}; } }

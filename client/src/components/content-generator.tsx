@@ -3,15 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// Select ve constants importları kalsa da sorun olmaz (kullanmıyoruz)
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { Textarea } from "@/components/ui/textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-// import { CONTENT_TYPES, TONE_OPTIONS } from "@/lib/constants";
 import { useWallet } from "@/hooks/use-wallet";
 import { useLanguage } from "@/components/language-provider";
 import { ContentSuggestions } from "@/components/content-suggestions";
@@ -32,7 +28,16 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
   const [lastError, setLastError] = useState<string | null>(null);
   const { user } = useWallet();
   const { toast } = useToast();
+
+  // useLanguage genelde t ile birlikte aktif dili de verir.
+  // Sağlam bir fallback ekledim: tarayıcı dili TR ise 'tr', değilse 'en'
+  const langFromProvider = (useLanguage() as any)?.lang;
   const { t } = useLanguage();
+  const uiLang: "tr" | "en" =
+    (langFromProvider === "tr" || langFromProvider === "en")
+      ? langFromProvider
+      : (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
+
   const queryClient = useQueryClient();
 
   // Dil değişince formları temizle (contentType/tone yok artık)
@@ -46,10 +51,11 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
     return () => window.removeEventListener('languageChanged', handleLanguageChange);
   }, [onContentGenerated]);
 
-  // AI içerik üretimi: SADECE topic => GET /api/generate?prompt=...
+  // AI içerik üretimi: SADECE topic => GET /api/generate?prompt=...&lang=tr|en
   const generateContentMutation = useMutation({
     mutationFn: async ({ topic }: { topic: string }) => {
-      const r = await fetch(`/api/generate?prompt=${encodeURIComponent(topic)}`, { method: "GET" });
+      const url = `/api/generate?prompt=${encodeURIComponent(topic)}&lang=${uiLang}`;
+      const r = await fetch(url, { method: "GET" });
       let data: any = {};
       try { data = await r.json(); } catch {}
       if (!r.ok) {
@@ -172,8 +178,6 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
         return;
       }
       draftTopic = topic.trim();
-      // AI çıktısını ContentPreview'den alan üst parent zaten gösteriyor;
-      // burada generatedContent'i ayrıca taşımıyoruz.
     } else {
       if (!manualContent.trim()) {
         toast({
