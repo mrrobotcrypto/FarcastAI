@@ -29,18 +29,14 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
   const { user } = useWallet();
   const { toast } = useToast();
 
-  // useLanguage genelde t ile birlikte aktif dili de verir.
-  // Sağlam bir fallback ekledim: tarayıcı dili TR ise 'tr', değilse 'en'
-  const langFromProvider = (useLanguage() as any)?.lang;
-  const { t } = useLanguage();
-  const uiLang: "tr" | "en" =
-    (langFromProvider === "tr" || langFromProvider === "en")
-      ? langFromProvider
-      : (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
+  // Dil ve çeviri sağlayıcı
+  const langCtx = useLanguage() as any;
+  const t = langCtx.t as (k: string) => string;
+  const activeLang: string = (langCtx.lang || langCtx.current || "tr") as string; // 'tr' | 'en'
 
   const queryClient = useQueryClient();
 
-  // Dil değişince formları temizle (contentType/tone yok artık)
+  // Dil değişince formları temizle
   useEffect(() => {
     const handleLanguageChange = () => {
       setTopic("");
@@ -51,10 +47,10 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
     return () => window.removeEventListener('languageChanged', handleLanguageChange);
   }, [onContentGenerated]);
 
-  // AI içerik üretimi: SADECE topic => GET /api/generate?prompt=...&lang=tr|en
+  // AI içerik üretimi: SADECE topic + lang => GET /api/generate
   const generateContentMutation = useMutation({
     mutationFn: async ({ topic }: { topic: string }) => {
-      const url = `/api/generate?prompt=${encodeURIComponent(topic)}&lang=${uiLang}`;
+      const url = `/api/generate?prompt=${encodeURIComponent(topic)}&lang=${encodeURIComponent(activeLang)}`;
       const r = await fetch(url, { method: "GET" });
       let data: any = {};
       try { data = await r.json(); } catch {}
@@ -148,6 +144,7 @@ export function ContentGenerator({ onContentGenerated }: ContentGeneratorProps) 
       return;
     }
 
+    // Manuel içerik uçta da kısa/hastag zorlamıyorsa, kullanıcı metnine dokunmuyoruz.
     onContentGenerated(manualContent.trim(), 'manual');
     toast({
       title: t('toast.manualContentReady'),
