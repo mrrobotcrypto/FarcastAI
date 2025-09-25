@@ -1,14 +1,13 @@
 // api/generate.ts
 type ReqBody = { prompt?: string; topic?: string; lang?: string };
 
-// --- Kısa metin + #FarcastAI etiketi ---
+// Kısa metin + sonda #FarcastAI
 function enforceShortOutput(text: string): string {
   if (!text) return "";
   let t = text
-    .replace(/^(\s*[-*]\s+)/gm, "")
-    .replace(/^(\s*\d+\.\s+)/gm, "")
-    .replace(/^#{1,6}\s+/gm, "");
-
+    .replace(/^(\s*[-*]\s+)/gm, "")        // "- " veya "* "
+    .replace(/^(\s*\d+\.\s+)/gm, "")       // "1. "
+    .replace(/^#{1,6}\s+/gm, "");          // "# Başlık"
   const paras = t.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).slice(0, 2);
   t = paras.join("\n\n");
   if (t.length > 700) t = t.slice(0, 680).replace(/\s+\S*$/, "") + "…";
@@ -16,42 +15,34 @@ function enforceShortOutput(text: string): string {
   return t;
 }
 
-// --- Basit ve sağlam dil tespiti ---
-const TR_CHARS = /[ıİğĞşŞçÇöÖüÜ]/;
-const TR_HINTS = /\b(ve|ile|için|nedir|nasıl|olarak|bir|de|da|mı|mi|mu|mü|çünkü|ancak|ama)\b/i;
-const EN_HINTS = /\b(the|and|with|for|what|how|as|is|are|a|an|in|on|because|however|but)\b/i;
+// Basit dil tespiti (heuristic)
+function detectLangAuto(s: string): "tr" | "en" {
+  const txt = (s || "").toLowerCase();
 
-function inferLanguage(prompt: string, acceptLang?: string): "tr" | "en" {
-  const p = (prompt || "").toLowerCase();
+  // Açık talimatlar override
+  if (/\bwrite (it|the answer)? in english\b|\benglish only\b/.test(txt)) return "en";
+  if (/(türkçe yaz|türkçe cevapla|cevabı türkçe yaz)/.test(txt)) return "tr";
 
-  // Açık komutlar (override)
-  if (/\b(ingilizce|english)\b/.test(p) || /ingilizce (yaz|içerik|cevap)/i.test(p) || /write in english/i.test(p)) {
-    return "en";
-  }
-  if (/\b(türkçe|turkish)\b/.test(p) || /türkçe (yaz|içerik|cevap)/i.test(p) || /write in turkish/i.test(p)) {
-    return "tr";
-  }
+  // Türkçe karakter / kelime ipuçları
+  const hasTrChar = /[çğıöşü]/i.test(txt);
+  const trWords = /\b(ve|bir|nedir|nasıl|için|hakkında|olarak|çok|daha|ama|fiyat|kadar)\b/i.test(txt);
 
-  // Karakter ve ipucu sezgileri
-  if (TR_CHARS.test(prompt)) return "tr";
-  const trScore = (p.match(TR_HINTS)?.length || 0);
-  const enScore = (p.match(EN_HINTS)?.length || 0);
-  if (trScore || enScore) return enScore >= trScore ? "en" : "tr";
+  // İngilizce ipuçları
+  const enWords = /\b(the|and|what|how|why|is|are|with|about)\b/i.test(txt);
 
-  // Tarayıcı dili yedek
-  if (typeof acceptLang === "string") {
-    const al = acceptLang.toLowerCase();
-    if (al.startsWith("tr")) return "tr";
-    if (al.startsWith("en")) return "en";
-  }
+  if (hasTrChar || trWords) return "tr";
+  if (enWords) return "en";
 
-  // Varsayılan
-  return "en";
+  // Latin-only ise çoğu zaman EN
+  const latinOnly = /^[\x00-\x7F\s\p{P}]+$/u.test(txt);
+  return latinOnly ? "en" : "tr";
 }
+
+function safeJson(s: string) { try { return JSON.parse(s); } catch { return {}; } }
 
 export default async function handler(req: any, res: any) {
   try {
-    // CORS
+    // CORS + preflight
     const origin = (req.headers?.origin as string) || "*";
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -74,12 +65,12 @@ export default async function handler(req: any, res: any) {
     };
 
     let prompt = "";
-    let lang = ""; // "tr" | "en" | ""
+    let lang: string | "" = ""; // "tr" | "en" | ""
 
     if (method === "GET") {
       const q = req.query || {};
       prompt = firstNonEmpty(q.prompt, q.topic, q.q, q.text, q.title, q.query);
-      lang = (q.lang as string || "").trim().toLowerCase(); // manuel override (opsiyonel)
+      lang = (q.lang as string || "").trim().toLowerCase();
     } else if (method === "POST") {
       const ct = String(req.headers?.["content-type"] || "");
       if (ct.includes("application/json")) {
@@ -88,29 +79,26 @@ export default async function handler(req: any, res: any) {
         lang = (raw.lang as string || "").trim().toLowerCase();
       } else if (ct.includes("application/x-www-form-urlencoded")) {
         const bodyStr = typeof req.body === "string" ? req.body : "";
-        try {
-          const params = new URLSearchParams(bodyStr);
-          prompt = firstNonEmpty(
-            params.get("prompt"), params.get("topic"), params.get("q"),
-            params.get("text"), params.get("title"), params.get("query")
-          );
-          lang = (params.get("lang") || "").trim().toLowerCase();
-        } catch { /* ignore */ }
+        const params = new URLSearchParams(bodyStr);
+        prompt = firstNonEmpty(
+          params.get("prompt"),
+          params.get("topic"),
+          params.get("q"),
+          params.get("text"),
+          params.get("title"),
+          params.get("query")
+        );
+        lang = (params.get("lang") || "").trim().toLowerCase();
       } else if (ct.startsWith("multipart/form-data")) {
         return res.status(415).json({
           ok: false,
           message: "multipart/form-data desteklenmiyor. JSON veya GET querystring kullanın.",
-          hint: 'GET /api/generate?prompt=... veya POST application/json {"prompt":"..."}'
+          hint: "GET /api/generate?prompt=... veya POST application/json {\"prompt\":\"...\"}"
         });
-      } else if (ct === "" || ct === "text/plain") {
+      } else { // text/plain vs.
         const raw = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
         prompt = firstNonEmpty(raw.prompt, raw.topic, raw.q, raw.text, raw.title, raw.query);
         lang = (raw.lang as string || "").trim().toLowerCase();
-      } else {
-        return res.status(415).json({
-          ok: false, message: `Unsupported media type: ${ct}`,
-          hint: "application/json gönderin veya GET ?prompt= kullanın"
-        });
       }
     } else {
       return res.status(405).json({ ok: false, message: "Only GET or POST" });
@@ -123,40 +111,38 @@ export default async function handler(req: any, res: any) {
         examples: [
           "/api/generate?prompt=Merhaba",
           "/api/generate?topic=Bitcoin%20nedir",
-          'POST JSON: {"prompt":"Merhaba"}'
+          "POST JSON: {\"prompt\":\"Merhaba\"} veya {\"topic\":\"Bitcoin nedir\"}"
         ]
       });
     }
     // ---------- /INPUT ----------
 
-    // Dil seçimi: 1) lang query/body verilmişse onu kullan; 2) yoksa prompt’tan otomatik tespit
-    if (lang !== "tr" && lang !== "en") {
-      lang = inferLanguage(prompt, req.headers?.["accept-language"]);
-    }
+    // 1) Eğer lang param gelmişse onu kullan; 2) gelmemişse otomatik tespit
+    const auto = detectLangAuto(prompt);
+    const langFinal: "tr" | "en" = (lang === "tr" || lang === "en") ? (lang as any) : auto;
 
-    const langDirective = (lang === "tr")
-      ? "YANITI TÜRKÇE YAZ. Kullanıcı özel olarak başka bir dil istemedikçe çeviri yapma."
-      : "WRITE THE ANSWER IN ENGLISH. Do not translate unless the user explicitly asked for another language.";
+    // Kurallar (senin şablonun)
+    const rulesTR = `Aşağıdaki isteğe KISA ve ÖZ yanıt ver. Kurallar:
+- 1 paragraf, en fazla 2 paragraf.
+- Liste/madde işareti kullanma; akıcı düz metin yaz.
+- Gevezelik etme; somut ve net ol.
+- Yanıtın SONUNDA mutlaka "#FarcastAI" etiketi olsun.`;
+
+    const rulesEN = `Respond BRIEFLY and CLEARLY. Rules:
+- Prefer 1 paragraph, maximum 2.
+- Do not use lists or headings.
+- No fluff; be concise and concrete.
+- Always END with "#FarcastAI".`;
+
+    const rules = langFinal === "en" ? rulesEN : rulesTR;
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      res.status(503).json({ ok: false, message: "GEMINI_API_KEY missing in Vercel env" });
-      return;
-    }
+    if (!apiKey) { res.status(503).json({ ok: false, message: "GEMINI_API_KEY missing in Vercel env" }); return; }
 
     const model = process.env.GEMINI_MODEL || "models/gemini-1.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
 
-    const finalPrompt =
-`${langDirective}
-Cevap KURALLARI:
-- Tercihen 1 paragraf, en fazla 2 paragraf.
-- Liste/madde işareti kullanma; akıcı düz metin yaz.
-- Gevezelik etme; somut ve net ol.
-- Yanıtın SONUNDA mutlaka "#FarcastAI" etiketi olsun.
-
-USER REQUEST:
-${prompt}`;
+    const finalPrompt = `${rules}\n\nUSER PROMPT:\n${prompt}`;
 
     const payload = {
       contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
@@ -194,7 +180,7 @@ ${prompt}`;
       ok: true,
       provider: "gemini",
       model,
-      lang,          // seçilen/tespit edilen dil
+      lang: langFinal,
       text,
       content: text,
       result: text,
@@ -205,5 +191,3 @@ ${prompt}`;
     res.status(500).json({ ok: false, message: err?.message || "Internal Server Error" });
   }
 }
-
-function safeJson(s: string) { try { return JSON.parse(s); } catch { return {}; } }
