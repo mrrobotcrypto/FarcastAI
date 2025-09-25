@@ -5,20 +5,16 @@ type ReqBody = { prompt?: string; topic?: string; lang?: string };
 function enforceShortOutput(text: string): string {
   if (!text) return "";
 
-  // Madde işaretleri ve başlıkları sadeleştir
   let t = text
     .replace(/^(\s*[-*]\s+)/gm, "")       // "- " veya "* " başlarını kaldır
     .replace(/^(\s*\d+\.\s+)/gm, "")      // "1. " gibi numaralı listeleri kaldır
     .replace(/^#{1,6}\s+/gm, "");         // "# Başlık" markdown başlıklarını kaldır
 
-  // Paragraflara böl, en fazla 2 paragraf bırak
   const paras = t.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).slice(0, 2);
   t = paras.join("\n\n");
 
-  // Çok uzunsa yumuşat (yaklaşık 700 karakter)
   if (t.length > 700) t = t.slice(0, 680).replace(/\s+\S*$/, "") + "…";
 
-  // Sonda #FarcastAI yoksa ekle
   if (!/#FarcastAI\b/.test(t)) t = t.replace(/\s+$/, "") + " #FarcastAI";
 
   return t;
@@ -26,7 +22,7 @@ function enforceShortOutput(text: string): string {
 
 export default async function handler(req: any, res: any) {
   try {
-    // CORS + preflight
+    // --- CORS ---
     const origin = (req.headers?.origin as string) || "*";
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -43,18 +39,16 @@ export default async function handler(req: any, res: any) {
 
     // ---------- INPUT ----------
     const method = String(req.method || "GET").toUpperCase();
-
     const firstNonEmpty = (...vals: any[]): string => {
       for (const v of vals) if (typeof v === "string" && v.trim()) return v.trim();
       return "";
     };
 
     let prompt = "";
-    let lang = ""; // "tr" | "en" | ""
+    let lang = ""; // "tr" | "en"
 
     if (method === "GET") {
       const q = req.query || {};
-      // URL: ?prompt=, ?topic=, ?q=, ?text=, ?title=, ?query=
       prompt = firstNonEmpty(q.prompt, q.topic, q.q, q.text, q.title, q.query);
       lang = (q.lang as string || "").trim().toLowerCase();
     } else if (method === "POST") {
@@ -76,7 +70,7 @@ export default async function handler(req: any, res: any) {
             params.get("query")
           );
           lang = (params.get("lang") || "").trim().toLowerCase();
-        } catch { /* yoksay */ }
+        } catch {}
       } else if (ct.startsWith("multipart/form-data")) {
         return res.status(415).json({
           ok: false,
@@ -84,7 +78,6 @@ export default async function handler(req: any, res: any) {
           hint: "GET /api/generate?prompt=... veya POST application/json {\"prompt\":\"...\"}"
         });
       } else if (ct === "" || ct === "text/plain") {
-        // Bazı istemciler content-type göndermiyor → basit deneme
         const raw = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
         prompt = firstNonEmpty(raw.prompt, raw.topic, raw.q, raw.text, raw.title, raw.query);
         lang = (raw.lang as string || "").trim().toLowerCase();
@@ -118,14 +111,15 @@ export default async function handler(req: any, res: any) {
     else if (lang === "en") langDirective = "WRITE THE ANSWER IN ENGLISH.";
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) { res.status(503).json({ ok: false, message: "GEMINI_API_KEY missing in Vercel env" }); return; }
+    if (!apiKey) {
+      res.status(503).json({ ok: false, message: "GEMINI_API_KEY missing in Vercel env" });
+      return;
+    }
 
     const model = process.env.GEMINI_MODEL || "models/gemini-1.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`;
 
-    // KISA-ÇIKTI + dil talimatı ile sarmalanmış nihai prompt
-    const finalPrompt =
-`${langDirective}
+    const finalPrompt = `${langDirective}
 Aşağıdaki isteğe KISA ve ÖZ yanıt ver. ÇIKTI KURALLARI:
 - Tercihen 1 paragraf, en fazla 2 paragraf.
 - Liste/madde işareti kullanma; akıcı düz metin yaz.
@@ -143,7 +137,7 @@ ${prompt}`;
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     const textBody = await r.text().catch(() => "");
@@ -155,15 +149,20 @@ ${prompt}`;
       const message = data?.error?.message || "Gemini error";
       const retryAfter = r.headers.get("retry-after") || undefined;
       res.status(status).json({
-        ok: false, provider: "gemini", status, message, retryAfter,
-        body: textBody.slice(0, 1000)
+        ok: false,
+        provider: "gemini",
+        status,
+        message,
+        retryAfter,
+        body: textBody.slice(0, 1000),
       });
       return;
     }
 
     const raw =
       data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text).filter(Boolean).join("\n") ??
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+      "";
 
     const text = enforceShortOutput(raw || "");
 
@@ -172,10 +171,11 @@ ${prompt}`;
       via: method,
       provider: "gemini",
       model,
-      text,           // modern
-      content: text,  // alternatif
-      result: text,   // legacy
-      message: text   // legacy
+      lang,
+      text,
+      content: text,
+      result: text,
+      message: text,
     });
   } catch (err: any) {
     console.error("generate error", err);
@@ -183,4 +183,6 @@ ${prompt}`;
   }
 }
 
-function safeJson(s: string) { try { return JSON.parse(s); } catch { return {}; } }
+function safeJson(s: string) {
+  try { return JSON.parse(s); } catch { return {}; }
+}
