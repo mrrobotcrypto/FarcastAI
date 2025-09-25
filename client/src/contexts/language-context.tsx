@@ -107,6 +107,12 @@ const translations = {
     'toast.connectionFailed': 'Connection Failed',
     'toast.farcasterLinked': 'Farcaster account linked!',
     'toast.farcasterLinkedDesc': 'account automatically linked',
+
+ // ... mevcut anahtarların ...
+    'gm.button': 'Daily GM',
+    'gm.sending': 'Sending...',
+    'gm.sent': 'Sent on-chain GM on Base.',
+    'gm.failed': 'Transaction failed',
     
     // Demo Mode
     'demo.indicator': 'Demo Mode: Casts are simulated - Not sent to real Farcaster',
@@ -203,6 +209,12 @@ const translations = {
     'toast.connectionFailed': 'Bağlantı Başarısız',
     'toast.farcasterLinked': 'Farcaster hesabı bağlandı!',
     'toast.farcasterLinkedDesc': 'hesabınız otomatik olarak bağlandı',
+
+// ... mevcut anahtarların ...
+    'gm.button': 'Günlük GM',
+    'gm.sending': 'Gönderiliyor...',
+    'gm.sent': 'Base ağında on-chain GM gönderildi.',
+    'gm.failed': 'İşlem başarısız',
     
     // Demo Mode
     'demo.indicator': 'Demo Modu: Cast\'ler simüle ediliyor - Gerçek Farcaster\'a gönderilmiyor',

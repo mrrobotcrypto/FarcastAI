@@ -16,6 +16,9 @@ import { SiX } from "react-icons/si";
 import { Users } from "lucide-react";
 import type { ContentDraft } from "@shared/schema";
 
+// ✅ GM butonunu ekledik
+import OnchainGmButton from "@/components/OnchainGmButton";
+
 interface PexelsPhoto {
   id: number;
   src: {
@@ -77,7 +80,9 @@ export default function Home() {
       <div className="hidden md:block">
         <CornerWalletWidget />
         {/* Hamburger Menu positioned to the right of wallet widget */}
-        <div className="fixed top-4 right-4 z-50">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
+          {/* ✅ Desktop sağ üst: GM butonu */}
+          <OnchainGmButton />
           <HamburgerMenu />
         </div>
       </div>
@@ -98,16 +103,19 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Desktop: Empty space - controls moved to hamburger menu */}
-            <div className="hidden md:block">
-              {/* Desktop controls moved to hamburger menu positioned next to wallet */}
+            {/* ✅ Desktop: burada da bir kopya (header içi). İstersen kaldırabilirsin. */}
+            <div className="hidden md:flex items-center gap-3">
+              <OnchainGmButton />
             </div>
 
-            {/* Mobile: Hamburger menu + Wallet */}
+            {/* Mobile: Hamburger menu + Wallet + ✅ GM butonu */}
             <div className="flex md:hidden items-center space-x-2">
               <HamburgerMenu />
               <div className="scale-90">
                 <CornerWalletWidget />
+              </div>
+              <div className="scale-90">
+                <OnchainGmButton />
               </div>
             </div>
           </div>
