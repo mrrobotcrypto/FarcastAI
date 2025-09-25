@@ -17,7 +17,8 @@ import { Users } from "lucide-react";
 import type { ContentDraft } from "@shared/schema";
 
 // ✅ GM butonunu ekledik
-import OnchainGmButton from "@/components/OnchainGmButton";
+import { OnchainGmButton } from "@/components/onchain-gm-button";
+
 
 interface PexelsPhoto {
   id: number;

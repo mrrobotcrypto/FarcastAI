@@ -9,6 +9,7 @@ import { LanguageProvider } from "@/components/language-provider";
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
+import { OnchainGmButton } from "@/components/onchain-gm-button";
 
 function Router() {
   return (
